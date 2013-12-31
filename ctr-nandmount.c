@@ -83,6 +83,7 @@ int main(int argc, char *argv[])
 		printf("Options:\n");
 		printf("--readonly Open the NAND image in read-only mode and disable writing for the mounted image.\n");
 		printf("--noncsdhdr Don't load partition offsets and sizes from the NCSD header, load these during xorpad initialization instead.\n");
+		printf("--nandimgsize=0x<size> Use the specified size for the NAND image size instead of loading it with stat. This is required when the size from stat is value 0, such as when the NAND image is a block device.\n");
 		return 0;
 	}
 
@@ -103,6 +104,17 @@ int main(int argc, char *argv[])
 		else if(strncmp(argv[argi], "--noncsdhdr", 11)==0)
 		{
 			noncsdhdr = 1;
+		}
+		else if(strncmp(argv[argi], "--nandimgsize=", 14)==0)
+		{
+			if(argv[argi][14]!='0' || argv[argi][14+1]!='x')
+			{
+				printf("Input value for nandimgsize is invalid.\n");
+			}
+			else
+			{
+				sscanf(&argv[argi][14+2], "%x", &nandimage_size);
+			}
 		}
 		else
 		{
@@ -126,8 +138,20 @@ int main(int argc, char *argv[])
 		free(fargv);
 		return 1;
 	}
-	stat(argv[1], &filestat);
-	nandimage_size = filestat.st_size;
+	
+	if(nandimage_size==0)
+	{
+		stat(argv[1], &filestat);
+		nandimage_size = filestat.st_size;
+	}
+
+	if(nandimage_size==0)
+	{
+		printf("Invalid NAND image size, specify a valid size with the --nandimgsize option.\n");
+		fclose(fnand);
+		free(fargv);
+		return 3;
+	}
 
 	if(noncsdhdr==0)
 	{
