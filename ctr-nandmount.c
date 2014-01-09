@@ -29,7 +29,7 @@ typedef struct {
 } ncsdpart_context_struct;
 
 FILE *fnand;
-unsigned int nandimage_size;
+unsigned int nandimage_size, nandimage_baseoffset=0;
 int nand_readonly = 0;
 int using_multipartitions = 0;
 
@@ -83,7 +83,8 @@ int main(int argc, char *argv[])
 		printf("Options:\n");
 		printf("--readonly Open the NAND image in read-only mode and disable writing for the mounted image.\n");
 		printf("--noncsdhdr Don't load partition offsets and sizes from the NCSD header, load these during xorpad initialization instead.\n");
-		printf("--nandimgsize=0x<size> Use the specified size for the NAND image size instead of loading it with stat. This is required when the size from stat is value 0, such as when the NAND image is a block device.\n");
+		printf("--nandimgsize=0x<size> Use the specified size for the NAND image size instead of loading it with stat.\n");
+		printf("--nandoff=0x<offset> Set the base offset(default is zero) of the actual image within the specified file/device. If stat() is sucessfully used for getting the imagesize, the imagesize is subtracted by this nandoff.\n");
 		return 0;
 	}
 
@@ -116,6 +117,17 @@ int main(int argc, char *argv[])
 				sscanf(&argv[argi][14+2], "%x", &nandimage_size);
 			}
 		}
+		else if(strncmp(argv[argi], "--nandoff=", 10)==0)
+		{
+			if(argv[argi][10]!='0' || argv[argi][10+1]!='x')
+			{
+				printf("Input value for nandoff is invalid.\n");
+			}
+			else
+			{
+				sscanf(&argv[argi][10+2], "%x", &nandimage_baseoffset);
+			}
+		}
 		else
 		{
 			fargv[i] = argv[argi];
@@ -143,18 +155,20 @@ int main(int argc, char *argv[])
 	{
 		stat(argv[1], &filestat);
 		nandimage_size = filestat.st_size;
+
+		if(filestat.st_size)nandimage_size-= nandimage_baseoffset;
 	}
 
 	if(nandimage_size==0)
 	{
-		printf("Invalid NAND image size, specify a valid size with the --nandimgsize option.\n");
-		fclose(fnand);
-		free(fargv);
-		return 3;
+		printf("Invalid NAND image size, using default imagesize of 0x3af00000.\n");
+		nandimage_size = 0x3af00000;
 	}
 
 	if(noncsdhdr==0)
 	{
+		fseek(fnand, nandimage_baseoffset, SEEK_SET);
+
 		if(fread(&ncsdhdr, 1, sizeof(ctr_ncsdheader), fnand)!=sizeof(ctr_ncsdheader))
 		{
 			fclose(fnand);
@@ -472,7 +486,7 @@ int nand_read(const char *path, char *buf, size_t size, off_t offset, struct fus
 
 		if(using_mainimage)
 		{
-			if(fseek(fnand, offset, SEEK_SET)==-1)
+			if(fseek(fnand, nandimage_baseoffset + offset, SEEK_SET)==-1)
 			{
 				free(xorbuf);
 				return -EIO;
@@ -485,7 +499,7 @@ int nand_read(const char *path, char *buf, size_t size, off_t offset, struct fus
 		}
 		else
 		{
-			if(fseek(fnand, offset + part->imageoffset, SEEK_SET)==-1)
+			if(fseek(fnand, nandimage_baseoffset + offset + part->imageoffset, SEEK_SET)==-1)
 			{
 				free(xorbuf);
 				return -EIO;
@@ -599,7 +613,7 @@ int nand_write(const char *path, const char *buf, size_t size, off_t offset, str
 
 		if(using_mainimage)
 		{
-			if(fseek(fnand, offset, SEEK_SET)==-1)
+			if(fseek(fnand, nandimage_baseoffset + offset, SEEK_SET)==-1)
 			{
 				free(xorbuf);
 				return -EIO;
@@ -612,7 +626,7 @@ int nand_write(const char *path, const char *buf, size_t size, off_t offset, str
 		}
 		else
 		{
-			if(fseek(fnand, offset + part->imageoffset, SEEK_SET)==-1)
+			if(fseek(fnand, nandimage_baseoffset + offset + part->imageoffset, SEEK_SET)==-1)
 			{
 				free(xorbuf);
 				return -EIO;
