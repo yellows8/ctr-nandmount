@@ -12,13 +12,15 @@ int nand_getattr(const char *path, struct stat *stbuf);
 int nand_open(const char *path, struct fuse_file_info *fi);
 int nand_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
 int nand_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
+int nand_truncate(const char *path, off_t size);
 
 static struct fuse_operations nand_operations = {
 	.getattr = nand_getattr,
 	.readdir = nand_readdir,
 	.open    = nand_open,
 	.read    = nand_read,
-	.write   = nand_write
+	.write   = nand_write,
+	.truncate = nand_truncate
 };
 
 typedef struct {
@@ -165,6 +167,8 @@ int main(int argc, char *argv[])
 		nandimage_size = 0x3af00000;
 	}
 
+	printf("Using NAND image base offset 0x%x.\n", nandimage_baseoffset);
+
 	if(noncsdhdr==0)
 	{
 		fseek(fnand, nandimage_baseoffset, SEEK_SET);
@@ -174,6 +178,14 @@ int main(int argc, char *argv[])
 			fclose(fnand);
 			free(fargv);
 			printf("Failed to read NCSD header.\n");
+			return 2;
+		}
+
+		if(strncmp((char*)ncsdhdr.magic, "NCSD", 4)!=0)
+		{
+			fclose(fnand);
+			free(fargv);
+			printf("Invalid NCSD magic.\n");
 			return 2;
 		}
 
@@ -407,6 +419,11 @@ int nand_open(const char *path, struct fuse_file_info *fi)
 	}
 
 	return -ENOENT;
+}
+
+int nand_truncate(const char *path, off_t size)
+{
+	return nand_open(path, NULL);
 }
 
 int nand_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
