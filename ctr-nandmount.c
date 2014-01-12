@@ -31,7 +31,7 @@ typedef struct {
 } ncsdpart_context_struct;
 
 FILE *fnand;
-unsigned int nandimage_size, nandimage_baseoffset=0;
+off_t nandimage_size, nandimage_baseoffset=0;
 int nand_readonly = 0;
 int using_multipartitions = 0;
 
@@ -68,6 +68,7 @@ int main(int argc, char *argv[])
 	int fail;
 	int noncsdhdr=0;
 	int offset_set;
+	unsigned long long tmpval=0;
 	unsigned int mediaunitsize;
 	char *ptr;
 	char **fargv;
@@ -116,7 +117,8 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				sscanf(&argv[argi][14+2], "%x", &nandimage_size);
+				sscanf(&argv[argi][14+2], "%llx", &tmpval);
+				nandimage_size = (off_t)tmpval;
 			}
 		}
 		else if(strncmp(argv[argi], "--nandoff=", 10)==0)
@@ -127,7 +129,8 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				sscanf(&argv[argi][10+2], "%x", &nandimage_baseoffset);
+				sscanf(&argv[argi][10+2], "%llx", &tmpval);
+				nandimage_baseoffset = (off_t)tmpval;
 			}
 		}
 		else
@@ -167,11 +170,11 @@ int main(int argc, char *argv[])
 		nandimage_size = 0x3af00000;
 	}
 
-	printf("Using NAND image base offset 0x%x.\n", nandimage_baseoffset);
+	printf("Using NAND image base offset 0x%llx.\n", (unsigned long long)nandimage_baseoffset);
 
 	if(noncsdhdr==0)
 	{
-		fseek(fnand, nandimage_baseoffset, SEEK_SET);
+		fseeko(fnand, nandimage_baseoffset, SEEK_SET);
 
 		if(fread(&ncsdhdr, 1, sizeof(ctr_ncsdheader), fnand)!=sizeof(ctr_ncsdheader))
 		{
@@ -503,12 +506,12 @@ int nand_read(const char *path, char *buf, size_t size, off_t offset, struct fus
 
 		if(using_mainimage)
 		{
-			if(fseek(fnand, nandimage_baseoffset + offset, SEEK_SET)==-1)
+			if(fseeko(fnand, nandimage_baseoffset + offset, SEEK_SET)==-1)
 			{
 				free(xorbuf);
 				return -EIO;
 			}
-			if(fseek(fxorpad, offset - part->imageoffset, SEEK_SET)==-1)
+			if(fseeko(fxorpad, offset - part->imageoffset, SEEK_SET)==-1)
 			{
 				free(xorbuf);
 				return -EIO;
@@ -516,12 +519,12 @@ int nand_read(const char *path, char *buf, size_t size, off_t offset, struct fus
 		}
 		else
 		{
-			if(fseek(fnand, nandimage_baseoffset + offset + part->imageoffset, SEEK_SET)==-1)
+			if(fseeko(fnand, nandimage_baseoffset + offset + part->imageoffset, SEEK_SET)==-1)
 			{
 				free(xorbuf);
 				return -EIO;
 			}
-			if(fseek(fxorpad, offset, SEEK_SET)==-1)
+			if(fseeko(fxorpad, offset, SEEK_SET)==-1)
 			{
 				free(xorbuf);
 				return -EIO;
@@ -630,12 +633,12 @@ int nand_write(const char *path, const char *buf, size_t size, off_t offset, str
 
 		if(using_mainimage)
 		{
-			if(fseek(fnand, nandimage_baseoffset + offset, SEEK_SET)==-1)
+			if(fseeko(fnand, nandimage_baseoffset + offset, SEEK_SET)==-1)
 			{
 				free(xorbuf);
 				return -EIO;
 			}
-			if(fseek(fxorpad, offset - part->imageoffset, SEEK_SET)==-1)
+			if(fseeko(fxorpad, offset - part->imageoffset, SEEK_SET)==-1)
 			{
 				free(xorbuf);
 				return -EIO;
@@ -643,12 +646,12 @@ int nand_write(const char *path, const char *buf, size_t size, off_t offset, str
 		}
 		else
 		{
-			if(fseek(fnand, nandimage_baseoffset + offset + part->imageoffset, SEEK_SET)==-1)
+			if(fseeko(fnand, nandimage_baseoffset + offset + part->imageoffset, SEEK_SET)==-1)
 			{
 				free(xorbuf);
 				return -EIO;
 			}
-			if(fseek(fxorpad, offset, SEEK_SET)==-1)
+			if(fseeko(fxorpad, offset, SEEK_SET)==-1)
 			{
 				free(xorbuf);
 				return -EIO;
